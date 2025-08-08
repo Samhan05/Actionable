@@ -9,116 +9,87 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
         }
     </style>
 </head>
-<body class="p-4 md:p-8 flex items-center justify-center min-h-screen">
+<body class="p-4 md:p-8 flex items-center justify-center min-h-screen bg-gray-900 text-white">
 
-    <div class="container mx-auto p-6 bg-white rounded-lg shadow-lg max-w-2xl w-full">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">Order Data Extractor</h1>
+    <div class="container mx-auto p-6 bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full">
+        <h1 class="text-3xl font-bold text-center text-yellow-400 mb-4">Order Data Extractor</h1>
         
-        <p class="text-sm text-gray-600 mb-4 text-center">
-            Paste your entire text block below to extract and send order IDs and deadlines to your Google Sheet.
+        <p class="text-sm text-gray-400 mb-4 text-center">
+            Paste your order data below to extract and send it to your Google Sheet.
         </p>
 
-        <!-- User must paste their deployed Apps Script URL here -->
-        <div class="mb-4">
-            <label for="appsScriptUrl" class="block text-sm font-medium text-gray-700">Google Apps Script Web App URL</label>
-            <input type="text" id="appsScriptUrl" class="mt-1 block w-full p-2 border-2 border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Paste your deployed Apps Script URL here">
-        </div>
-
         <!-- Textarea for user input -->
-        <textarea id="inputText" rows="10" class="w-full p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors" placeholder="Paste your order data here..."></textarea>
+        <textarea id="inputText" rows="10" class="w-full p-4 border-2 border-gray-700 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-yellow-400 transition-colors placeholder-gray-500"></textarea>
         
         <!-- Button to trigger the extraction and sending -->
-        <button onclick="processOrders()" class="w-full mt-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+        <button onclick="processOrders()" class="w-full mt-4 py-3 bg-yellow-400 text-gray-900 font-bold rounded-lg shadow-md hover:bg-yellow-500 transition-colors">
             Extract and Send to Google Sheet
         </button>
 
         <!-- Div to display the extraction and upload status -->
-        <div id="output" class="mt-8 p-6 bg-gray-100 rounded-lg border border-gray-200 min-h-[100px] max-h-[400px] overflow-y-auto">
-            <p class="text-gray-500 text-center">Status updates will appear here...</p>
+        <div id="output" class="mt-8 p-6 bg-gray-700 rounded-lg border border-gray-600 min-h-[100px] max-h-[400px] overflow-y-auto">
+            <p class="text-gray-400 text-center">Status updates will appear here...</p>
         </div>
     </div>
 
     <script>
         async function processOrders() {
-            const appsScriptUrl = document.getElementById('appsScriptUrl').value;
+            // IMPORTANT: Replace this placeholder with your actual Google Apps Script Web App URL
+            const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxH4gorXkyfuofGu-UxXn1cK0YTJw45cDYYqNBvxKvhIf5_BcfXxFxkXZSG4XCeQowNdA/exec'; 
+
             const inputText = document.getElementById('inputText').value;
             const outputDiv = document.getElementById('output');
 
-            if (!appsScriptUrl) {
-                outputDiv.innerHTML = '<p class="text-red-500 text-center">Please enter your Google Apps Script URL.</p>';
+            if (appsScriptUrl === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+                outputDiv.innerHTML = '<p class="text-red-400 text-center">❌ Error: Please update the script URL in the code.</p>';
                 return;
             }
 
-            outputDiv.innerHTML = '<p class="text-gray-500 text-center animate-pulse">Extracting...</p>';
+            outputDiv.innerHTML = '<p class="text-gray-400 text-center animate-pulse">Extracting...</p>';
 
-            // Regex to find all order IDs and deadlines in the text
-            // (\d{5,}) finds an order ID that is at least 5 digits long.
-            // (?:VO\s*#)?\s*(\d+) captures the second number after VO #
-            // Note: The previous logic of simply finding the first number might not be robust.
-            // A better approach is to assume the order ID is the first number >= 5 digits on its own line,
-            // or a number associated with "VO #".
-            // Let's go with a more specific pattern for robustness.
             const regex = /(\d{5,})\n[\s\S]*?(-?\d+h)?\s*(-?\d+min)/g;
             let matches;
             const extractedData = [];
 
             while ((matches = regex.exec(inputText)) !== null) {
-                // matches[1] is the Order ID
                 const orderId = matches[1];
-
-                // matches[2] is the hours part (e.g., "-1h" or "1h")
                 let hours = matches[2] || '';
-                // matches[3] is the minutes part (e.g., "-25min" or "25min")
                 let minutes = matches[3] || '';
 
-                // Process the time strings to flip the sign
                 const processedHours = processTimePart(hours);
                 const processedMinutes = processTimePart(minutes);
 
-                // Combine the processed parts into a single deadline string
                 const deadline = (processedHours + ' ' + processedMinutes).trim();
 
-                // Add the extracted data to our results array
                 extractedData.push({ orderId, deadline });
             }
 
             if (extractedData.length > 0) {
-                outputDiv.innerHTML = `<p class="text-gray-500 text-center">Extracted ${extractedData.length} orders. Sending to Google Sheet...</p>`;
+                outputDiv.innerHTML = `<p class="text-gray-400 text-center">Extracted ${extractedData.length} orders. Sending to Google Sheet...</p>`;
                 
                 try {
-                    // Send the data to the Google Apps Script endpoint
                     const response = await fetch(appsScriptUrl, {
                         method: 'POST',
-                        mode: 'no-cors', // Required for Google Apps Script
+                        mode: 'no-cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify(extractedData),
                     });
 
-                    // Update the UI with a success message
-                    outputDiv.innerHTML = `<p class="text-green-600 font-semibold text-center">✅ Success! Data sent to your Google Sheet.</p>`;
+                    outputDiv.innerHTML = `<p class="text-green-400 font-semibold text-center">✅ Success! Data sent to your Google Sheet.</p>`;
                 } catch (error) {
-                    // Handle network or other errors
-                    outputDiv.innerHTML = `<p class="text-red-500 font-semibold text-center">❌ Error: Failed to send data to Google Sheet. Check your URL and script deployment.</p>`;
+                    outputDiv.innerHTML = `<p class="text-red-400 font-semibold text-center">❌ Error: Failed to send data to Google Sheet. Check your URL and script deployment.</p>`;
                     console.error("Error sending data:", error);
                 }
             } else {
-                outputDiv.innerHTML = '<p class="text-gray-500 text-center">No valid orders found. Please check your input text format and ensure order IDs are at least 5 digits.</p>';
+                outputDiv.innerHTML = '<p class="text-gray-400 text-center">No valid orders found. Please check your input text format.</p>';
             }
         }
 
-        /**
-         * Helper function to process a time string part (e.g., "1h" or "-25min").
-         * It flips the sign of the number in the string.
-         *
-         * @param {string} timePart The time part to process.
-         * @returns {string} The processed time part with the flipped sign.
-         */
         function processTimePart(timePart) {
             if (!timePart) {
                 return '';
@@ -130,7 +101,7 @@
             }
 
             const number = parseInt(numberMatch[1]);
-            const unit = timePart.replaceAll(numberMatch[0], ''); // Get the unit (h or min)
+            const unit = timePart.replaceAll(numberMatch[0], '');
 
             if (timePart.startsWith('-')) {
                 return `${number}${unit}`;
