@@ -24,7 +24,7 @@
         </p>
 
         <!-- Textarea for user input -->
-        <textarea id="inputText" rows="10" class="w-full p-4 border-2 border-gray-700 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-yellow-400 transition-colors placeholder-gray-500" placeholder="Paste order data here..."></textarea>
+        <textarea id="inputText" rows="10" class="w-full p-4 border-2 border-gray-700 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-yellow-400 transition-colors placeholder-gray-500"></textarea>
         
         <!-- Action Buttons -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
@@ -52,14 +52,20 @@
     </div>
 
     <script>
-        // --- HELPER FUNCTIONS ---
+        async function processOrders() {
+            // IMPORTANT: Replace this placeholder with your actual Google Apps Script Web App URL
+            const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxH4gorXkyfuofGu-UxXn1cK0YTJw45cDYYqNBvxKvhIf5_BcfXxFxkXZSG4XCeQowNdA/exec'; 
 
-        /**
-         * Extracts order data from the input text using regex.
-         * @param {string} inputText The raw text containing order information.
-         * @returns {Array<Object>} An array of objects, each with an orderId and deadline.
-         */
-        function extractDataFromText(inputText) {
+            const inputText = document.getElementById('inputText').value;
+            const outputDiv = document.getElementById('output');
+
+            if (appsScriptUrl === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+                outputDiv.innerHTML = '<p class="text-red-400 text-center">❌ Error: Please update the script URL in the code.</p>';
+                return;
+            }
+
+            outputDiv.innerHTML = '<p class="text-gray-400 text-center animate-pulse">Extracting...</p>';
+
             const regex = /(\d{5,})\n[\s\S]*?(-?\d+h)?\s*(-?\d+min)/g;
             let matches;
             const extractedData = [];
@@ -69,56 +75,21 @@
                 let hours = matches[2] || '';
                 let minutes = matches[3] || '';
 
-                // This function formats the time parts correctly
-                const processTimePart = (timePart) => {
-                    if (!timePart) return '';
-                    const numberMatch = timePart.match(/-?(\d+)/);
-                    if (!numberMatch) return timePart;
-                    const number = parseInt(numberMatch[1]);
-                    const unit = timePart.replaceAll(numberMatch[0], '');
-                    return timePart.startsWith('-') ? `${number}${unit}` : `-${number}${unit}`;
-                };
-
                 const processedHours = processTimePart(hours);
                 const processedMinutes = processTimePart(minutes);
+
                 const deadline = (processedHours + ' ' + processedMinutes).trim();
 
-                extractedData.push({ OrderID: orderId, Deadline: deadline });
+                extractedData.push({ orderId, deadline });
             }
-            return extractedData;
-        }
-
-
-        // --- BUTTON ACTIONS ---
-
-        /**
-         * Processes orders and sends them to a Google Sheet.
-         */
-        async function processOrders() {
-            // IMPORTANT: Replace this placeholder with your actual Google Apps Script Web App URL
-            const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbxH4gorXkyfuofGu-UxXn1cK0YTJw45cDYYqNBvxKvhIf5_BcfXxFxkXZSG4XCeQowNdA/exec'; 
-
-            const inputText = document.getElementById('inputText').value;
-            const outputDiv = document.getElementById('output');
-
-            if (appsScriptUrl.includes('YOUR_GOOGLE_APPS_SCRIPT_URL_HERE')) {
-                outputDiv.innerHTML = '<p class="text-red-400 text-center">❌ Error: Please update the Google Apps Script URL in the code.</p>';
-                return;
-            }
-
-            outputDiv.innerHTML = '<p class="text-gray-400 text-center animate-pulse">Extracting...</p>';
-            
-            const extractedData = extractDataFromText(inputText);
 
             if (extractedData.length > 0) {
                 outputDiv.innerHTML = `<p class="text-gray-400 text-center">Extracted ${extractedData.length} orders. Sending to Google Sheet...</p>`;
                 
                 try {
-                    // Note: 'no-cors' mode means we won't get a response back, but the request will be sent.
-                    // This is a common requirement when posting to Google Apps Scripts from a browser.
-                    await fetch(appsScriptUrl, {
+                    const response = await fetch(appsScriptUrl, {
                         method: 'POST',
-                        mode: 'no-cors', 
+                        mode: 'no-cors',
                         headers: {
                             'Content-Type': 'application/json',
                         },
@@ -127,11 +98,31 @@
 
                     outputDiv.innerHTML = `<p class="text-green-400 font-semibold text-center">✅ Success! Data sent to your Google Sheet.</p>`;
                 } catch (error) {
-                    outputDiv.innerHTML = `<p class="text-red-400 font-semibold text-center">❌ Error: Failed to send data. Check your URL and script deployment.</p>`;
+                    outputDiv.innerHTML = `<p class="text-red-400 font-semibold text-center">❌ Error: Failed to send data to Google Sheet. Check your URL and script deployment.</p>`;
                     console.error("Error sending data:", error);
                 }
             } else {
-                outputDiv.innerHTML = '<p class="text-yellow-400 text-center">No valid orders found. Please check your input text format.</p>';
+                outputDiv.innerHTML = '<p class="text-gray-400 text-center">No valid orders found. Please check your input text format.</p>';
+            }
+        }
+
+        function processTimePart(timePart) {
+            if (!timePart) {
+                return '';
+            }
+
+            const numberMatch = timePart.match(/-?(\d+)/);
+            if (!numberMatch) {
+                return timePart;
+            }
+
+            const number = parseInt(numberMatch[1]);
+            const unit = timePart.replaceAll(numberMatch[0], '');
+
+            if (timePart.startsWith('-')) {
+                return `${number}${unit}`;
+            } else {
+                return `-${number}${unit}`;
             }
         }
 
@@ -144,7 +135,23 @@
             
             outputDiv.innerHTML = '<p class="text-gray-400 text-center animate-pulse">Extracting data for download...</p>';
             
-            const extractedData = extractDataFromText(inputText);
+            const regex = /(\d{5,})\n[\s\S]*?(-?\d+h)?\s*(-?\d+min)/g;
+            let matches;
+            const extractedData = [];
+
+            while ((matches = regex.exec(inputText)) !== null) {
+                const orderId = matches[1];
+                let hours = matches[2] || '';
+                let minutes = matches[3] || '';
+
+                const processedHours = processTimePart(hours);
+                const processedMinutes = processTimePart(minutes);
+
+                const deadline = (processedHours + ' ' + processedMinutes).trim();
+
+                // Using more descriptive keys for XLSX columns
+                extractedData.push({ OrderID: orderId, Deadline: deadline });
+            }
 
             if (extractedData.length > 0) {
                 // Create a new worksheet from the JSON data
