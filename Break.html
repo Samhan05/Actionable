@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Activity Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- New Font: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Library for XLSX file generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            /* Updated font family */
+            font-family: 'Poppins', sans-serif;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+        }
+        /* Style for disabled button */
+        .btn-disabled {
+            background-color: #9CA3AF; /* gray-400 */
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<!-- Updated background to a vivid gradient -->
+<body class="bg-gradient-to-br from-purple-100 to-blue-200 min-h-screen p-4 flex items-center justify-center">
+    <div class="w-full max-w-6xl mx-auto">
+        <!-- Banner Image Section -->
+        <div class="mb-8 rounded-2xl shadow-lg overflow-hidden">
+            <img src="download(1).png" 
+                 alt="Hungerstation Banner" 
+                 class="w-full h-auto object-cover"
+                 onerror="this.onerror=null;this.src='https://placehold.co/1200x250/cccccc/ffffff?text=Image+Not+Found';">
+        </div>
+
+        <!-- Updated main container with a glassy effect -->
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-6 md:p-10">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-800">Agent Activity Analyzer</h1>
+                <p class="text-slate-500 mt-2">Paste your agent activity logs below to calculate break times and task durations.</p>
+            </header>
+
+            <main>
+                <div class="mb-6">
+                    <label for="logInput" class="block text-sm font-medium text-slate-700 mb-2">Log Data:</label>
+                    <textarea id="logInput" rows="12" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white/70" placeholder="Paste the log data here, starting with 'Date: Minute' and followed by your data..."></textarea>
+                </div>
+
+                <div class="text-center mb-8 flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <button id="analyzeBtn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-transform transform hover:scale-105 w-full sm:w-auto">
+                        Analyze Logs
+                    </button>
+                    <button id="downloadBtn" class="bg-teal-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-300 transition-transform transform hover:scale-105 w-full sm:w-auto btn-disabled" disabled>
+                        Download Report (XLSX)
+                    </button>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Exceeded Breaks Column -->
+                    <div>
+                        <h2 class="text-2xl font-semibold text-slate-700 mb-4 pb-2 border-b-2 border-red-500">Exceeded Breaks (Limit: 1 Hour)</h2>
+                        <div id="exceededBreaks" class="space-y-4">
+                            <p class="text-slate-500">No agents with exceeded breaks found yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Assigned Tasks Column -->
+                    <div>
+                        <h2 class="text-2xl font-semibold text-slate-700 mb-4 pb-2 border-b-2 border-green-500">Assigned Task Durations</h2>
+                        <div id="assignedTasks" class="space-y-4">
+                            <p class="text-slate-500">No agents with assigned tasks found yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- Global variable to store the last analysis results ---
+        let lastAnalyzedStats = null;
+
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // --- Main Analysis Logic ---
+        analyzeBtn.addEventListener('click', () => {
+            const logText = document.getElementById('logInput').value;
+            if (!logText.trim()) {
+                showModal("Please paste some log data first.");
+                return;
+            }
+            
+            const parsedLogs = parseLogs(logText);
+            if (!parsedLogs.length) {
+                showModal("Could not parse any valid log entries. Please check the format.");
+                return;
+            }
+
+            const agentLogs = groupLogsByAgent(parsedLogs);
+            const agentStats = processAgentLogs(agentLogs);
+
+            lastAnalyzedStats = agentStats;
+            renderResults(agentStats);
+
+            downloadBtn.disabled = false;
+            downloadBtn.classList.remove('btn-disabled');
+        });
+
+        // --- Download Logic ---
+        downloadBtn.addEventListener('click', () => {
+            if (!lastAnalyzedStats) {
+                showModal("Please analyze some data first before downloading.");
+                return;
+            }
+
+            const breakLimitMillis = 60 * 60 * 1000;
+            const sheetData = [
+                ["Agent Name", "Total Break Time", "Exceeded By", "Total Assigned Task Time"]
+            ];
+
+            const sortedAgents = Object.keys(lastAnalyzedStats).sort();
+            sortedAgents.forEach(agent => {
+                const stats = lastAnalyzedStats[agent];
+                const exceededByMillis = Math.max(0, stats.totalBreakMillis - breakLimitMillis);
+
+                sheetData.push([
+                    agent,
+                    formatDuration(stats.totalBreakMillis),
+                    formatDuration(exceededByMillis),
+                    formatDuration(stats.totalTaskMillis)
+                ]);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Agent Report");
+
+            XLSX.writeFile(workbook, "Agent_Activity_Report.xlsx");
+        });
+
+
+        /**
+         * Parses the raw text log into an array of log objects.
+         * @param {string} text - The raw log data from the textarea.
+         * @returns {Array<Object>} An array of { timestamp: Date, agent: string, status: string }.
+         */
+        function parseLogs(text) {
+            const lines = text.trim().split('\n');
+            const logs = [];
+            for (let i = 3; i < lines.length; i += 3) {
+                const dateTimeStr = lines[i];
+                const agentName = lines[i + 1];
+                const status = lines[i + 2];
+
+                if (dateTimeStr && agentName && status) {
+                    const timestamp = new Date(dateTimeStr.replace(' Minute', ''));
+                    if (!isNaN(timestamp.getTime())) {
+                        logs.push({
+                            timestamp,
+                            agent: agentName.trim(),
+                            status: status.trim()
+                        });
+                    }
+                }
+            }
+            return logs.sort((a, b) => a.timestamp - b.timestamp);
+        }
+
+        /**
+         * Groups the flat array of logs into an object keyed by agent name.
+         * @param {Array<Object>} logs - The parsed log data.
+         * @returns {Object} An object like { "Agent Name": [log1, log2], ... }.
+         */
+        function groupLogsByAgent(logs) {
+            const grouped = {};
+            logs.forEach(log => {
+                if (!grouped[log.agent]) {
+                    grouped[log.agent] = [];
+                }
+                grouped[log.agent].push(log);
+            });
+            return grouped;
+        }
+
+        /**
+         * Calculates total break time and task time for each agent.
+         * @param {Object} agentLogs - Logs grouped by agent.
+         * @returns {Object} An object containing stats for each agent.
+         */
+        function processAgentLogs(agentLogs) {
+            const allAgentStats = {};
+            const breakStatuses = ['SHORT_BREAK', 'LUNCH'];
+            const assignedTaskStatus = 'ASSIGNED_TASK';
+
+            for (const agent in agentLogs) {
+                const logs = agentLogs[agent];
+                let totalBreakMillis = 0;
+                let totalTaskMillis = 0;
+
+                for (let i = 0; i < logs.length; i++) {
+                    const currentLog = logs[i];
+                    const nextLog = findNextStatusForAgent(agentLogs, agent, i);
+                    
+                    if (!nextLog) continue;
+
+                    const durationMillis = nextLog.timestamp - currentLog.timestamp;
+
+                    if (breakStatuses.includes(currentLog.status)) {
+                        totalBreakMillis += durationMillis;
+                    } else if (currentLog.status === assignedTaskStatus) {
+                        totalTaskMillis += durationMillis;
+                    }
+                }
+
+                allAgentStats[agent] = {
+                    totalBreakMillis,
+                    totalTaskMillis
+                };
+            }
+            return allAgentStats;
+        }
+        
+        /**
+         * Finds the very next chronological log for a specific agent.
+         * @param {Object} allLogsGrouped - All logs, grouped by agent.
+         * @param {string} agentName - The agent whose next log we are looking for.
+         * @param {number} currentIndex - The index of the current log in the agent's specific log array.
+         * @returns {Object|null} The next log object or null if none exists.
+         */
+        function findNextStatusForAgent(allLogsGrouped, agentName, currentIndex) {
+             const agentSpecificLogs = allLogsGrouped[agentName];
+             if (currentIndex + 1 < agentSpecificLogs.length) {
+                 return agentSpecificLogs[currentIndex + 1];
+             }
+             return null;
+        }
+
+
+        /**
+         * Renders the final calculated statistics into the HTML.
+         * @param {Object} agentStats - The processed agent statistics.
+         */
+        function renderResults(agentStats) {
+            const exceededBreaksContainer = document.getElementById('exceededBreaks');
+            const assignedTasksContainer = document.getElementById('assignedTasks');
+            exceededBreaksContainer.innerHTML = '';
+            assignedTasksContainer.innerHTML = '';
+
+            let exceededFound = false;
+            let tasksFound = false;
+            const breakLimitMillis = 60 * 60 * 1000; // 1 hour in milliseconds
+
+            const sortedAgents = Object.keys(agentStats).sort();
+
+            sortedAgents.forEach(agent => {
+                const stats = agentStats[agent];
+
+                if (stats.totalBreakMillis > breakLimitMillis) {
+                    exceededFound = true;
+                    const exceededBy = stats.totalBreakMillis - breakLimitMillis;
+                    const card = createResultCard(
+                        agent,
+                        `Total Break: ${formatDuration(stats.totalBreakMillis)}`,
+                        `Exceeded by: ${formatDuration(exceededBy)}`,
+                        'border-red-500'
+                    );
+                    exceededBreaksContainer.appendChild(card);
+                }
+
+                if (stats.totalTaskMillis > 0) {
+                    tasksFound = true;
+                    const card = createResultCard(
+                        agent,
+                        `Total Task Time: ${formatDuration(stats.totalTaskMillis)}`,
+                        null,
+                        'border-green-500'
+                    );
+                    assignedTasksContainer.appendChild(card);
+                }
+            });
+
+            if (!exceededFound) {
+                exceededBreaksContainer.innerHTML = '<p class="text-slate-500">No agents with exceeded breaks found.</p>';
+            }
+            if (!tasksFound) {
+                assignedTasksContainer.innerHTML = '<p class="text-slate-500">No agents with assigned tasks found.</p>';
+            }
+        }
+
+        /**
+         * Helper function to create a styled result card.
+         * @param {string} title - The agent's name.
+         * @param {string} line1 - The first line of info.
+         * @param {string|null} line2 - The second line of info (optional).
+         * @param {string} borderColor - The Tailwind class for the left border color.
+         * @returns {HTMLElement} The created card element.
+         */
+        function createResultCard(title, line1, line2, borderColor) {
+            const card = document.createElement('div');
+            card.className = `card p-4 border-l-4 ${borderColor} flex flex-col justify-center`;
+            
+            let content = `<h3 class="font-bold text-lg text-slate-800">${title}</h3><p class="text-slate-600">${line1}</p>`;
+            if (line2) {
+                content += `<p class="text-red-600 font-semibold">${line2}</p>`;
+            }
+            
+            card.innerHTML = content;
+            return card;
+        }
+
+        /**
+         * Formats milliseconds into a human-readable string (Hh Mm Ss).
+         * @param {number} millis - The duration in milliseconds.
+         * @returns {string} The formatted duration string.
+         */
+        function formatDuration(millis) {
+            if (millis < 0) millis = 0;
+            const totalSeconds = Math.floor(millis / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            let result = '';
+            if (hours > 0) result += `${hours}h `;
+            if (minutes > 0) result += `${minutes}m `;
+            if (seconds > 0 || result === '') result += `${seconds}s`;
+            
+            return result.trim();
+        }
+
+        /**
+         * A simple, non-blocking modal to replace alert().
+         * @param {string} message - The message to display.
+         */
+        function showModal(message) {
+            if (document.querySelector('.modal-backdrop')) return;
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            
+            const modal = document.createElement('div');
+            modal.className = 'bg-white rounded-lg shadow-xl p-6 w-11/12 max-w-sm text-center';
+            
+            const text = document.createElement('p');
+            text.textContent = message;
+            text.className = 'text-slate-700 mb-4';
+            
+            const closeButton = document.createElement('button');
+            closeButton.textContent = 'OK';
+            closeButton.className = 'bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300';
+            
+            modal.appendChild(text);
+            modal.appendChild(closeButton);
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            
+            closeButton.onclick = () => {
+                document.body.removeChild(backdrop);
+            };
+            backdrop.onclick = (e) => {
+                 if (e.target === backdrop) {
+                    document.body.removeChild(backdrop);
+                 }
+            };
+        }
+
+    </script>
+</body>
+</html>
