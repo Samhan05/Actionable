@@ -47,6 +47,7 @@
                 <li><b>Drop off / Return:</b> Keywords like <span class="font-mono bg-gray-600 px-1 rounded">return</span>, <span class="font-mono bg-gray-600 px-1 rounded">complete</span>, <span class="font-mono bg-gray-600 px-1 rounded">تم الارجاع</span>, <span class="font-mono bg-gray-600 px-1 rounded">otp</span>.</li>
                 <li><b>Cancel:</b> Keywords like <span class="font-mono bg-gray-600 px-1 rounded">cancel</span>, <span class="font-mono bg-gray-600 px-1 rounded">الغاء</span>. (Overridden by Drop off/Return).</li>
                  <li><b>Pick-up:</b> Keywords like <span class="font-mono bg-gray-600 px-1 rounded">make pickup</span>, <span class="font-mono bg-gray-600 px-1 rounded">pickup from your side</span>.</li>
+                 <li><b>Check Customer History:</b> Keywords like <span class="font-mono bg-gray-600 px-1 rounded">history</span>, <span class="font-mono bg-gray-600 px-1 rounded">سجل العميل</span>, <span class="font-mono bg-gray-600 px-1 rounded">check customer</span>, <span class="font-mono bg-gray-600 px-1 rounded">تأكيد الطلب</span>.</li>
                 <li><b>Re-dispatch:</b> Dispatch issues (<span class="font-mono bg-gray-600 px-1 rounded">late</span>, <span class="font-mono bg-gray-600 px-1 rounded">need car</span>, etc.) with a reply (<span class="font-mono bg-gray-600 px-1 rounded">1 reply</span>, <span class="font-mono bg-gray-600 px-1 rounded">View thread</span>).</li>
                 <li><b>Rider Notified:</b> Dispatch issues without a reply.</li>
             </ul>
@@ -226,11 +227,11 @@
          * Determines the correct action for a given line of text based on predefined rules.
          */
         function determineAction(line) {
-            const isDropOff = /ret(u|a|e)?rn|comp(l|e|a)?ete|تم ?الارجاع|مرتجع|otp/i.test(line);
+            const isDropOff = /ret(u|a|e)?rn|comp(l|e|a)?ete|تم ?(ال)?ارجاع|مرتجع|otp/i.test(line);
             const isCancel = /can(c|s|k)el|الغاء|cancl/i.test(line);
             const isPickup = /(make|mke) ?pickup|pickup from (ur|your) side|pick ?up (the )?order/i.test(line);
             const isSendNumber = /number|رقم ?المندوب|رقم ?السائق|contact number/i.test(line);
-            const isCheckHistory = /history|سجل ?العميل/i.test(line);
+            const isCheckHistory = /h(i|a)?story|سجل ?العميل|check (the )?customer|تأ?كيد الطلب/i.test(line);
 
             if (isDropOff) return 'Drop off / Return';
             if (isCancel) return 'Cancel';
